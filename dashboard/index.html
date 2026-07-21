@@ -605,6 +605,13 @@
       }
     }
 
+    // Check for error in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('error') === 'not_admin') {
+      alert('You do not have administrator permissions in any Discord server. Only server administrators can access this dashboard.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     checkAuth();
   </script>
 </body>

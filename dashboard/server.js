@@ -40,15 +40,20 @@ passport.use(new DiscordStrategy({
   scope: ['identify', 'guilds']
 }, async (accessToken, refreshToken, profile, done) => {
   try {
-    // Store session in database
-    const now = Date.now();
-    db.prepare('INSERT OR REPLACE INTO user_sessions (user_id, access_token, refresh_token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').run(
-      profile.id,
-      accessToken,
-      refreshToken,
-      now + (24 * 60 * 60 * 1000), // 24 hours
-      now
-    );
+    // Store session in database (with error handling)
+    try {
+      const now = Date.now();
+      db.prepare('INSERT OR REPLACE INTO user_sessions (user_id, access_token, refresh_token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').run(
+        profile.id,
+        accessToken,
+        refreshToken,
+        now + (24 * 60 * 60 * 1000), // 24 hours
+        now
+      );
+    } catch (dbError) {
+      console.error('Database error in OAuth callback:', dbError);
+      // Continue anyway - session will be in memory
+    }
     
     // Check if user is admin in any guild
     const isAdmin = profile.guilds?.some(guild => guild.permissions & 0x8) || false;
@@ -56,6 +61,7 @@ passport.use(new DiscordStrategy({
     profile.isAdmin = isAdmin;
     return done(null, profile);
   } catch (error) {
+    console.error('OAuth strategy error:', error);
     return done(error, null);
   }
 }));
@@ -105,13 +111,21 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/auth/discord', passport.authenticate('discord'));
 
 app.get('/auth/callback', 
-  passport.authenticate('discord', { failureRedirect: '/' }),
+  passport.authenticate('discord', { 
+    failureRedirect: '/?error=auth_failed',
+    failureMessage: true 
+  }),
   (req, res) => {
+    console.log('OAuth callback successful, user:', req.user?.username);
+    
     // Check if user is admin
     if (!req.user.isAdmin) {
+      console.log('User is not admin in any guild');
       res.redirect('/?error=not_admin');
       return;
     }
+    
+    console.log('Redirecting to dashboard...');
     res.redirect('/');
   }
 );
