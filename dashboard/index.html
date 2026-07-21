@@ -114,11 +114,28 @@
     .sidebar-logo {
       font-size: 28px;
       font-weight: 800;
-      margin-bottom: 40px;
+      margin-bottom: 24px;
       background: var(--gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+    }
+    .server-selector {
+      margin-bottom: 24px;
+    }
+    .server-selector label {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+    .server-select {
+      width: 100%;
+      padding: 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 14px;
+      cursor: pointer;
     }
     .nav-item {
       padding: 12px 16px;
@@ -336,6 +353,12 @@
   <div id="dashboard">
     <div class="sidebar">
       <div class="sidebar-logo">⚡ Tickety+</div>
+      <div class="server-selector">
+        <label>Select Server</label>
+        <select id="server-select" class="server-select" onchange="selectServer()">
+          <option value="">Loading servers...</option>
+        </select>
+      </div>
       <div class="nav-item active">
         <span>📋</span> Panel Creator
       </div>
@@ -418,6 +441,8 @@
 
   <script>
     let currentUser = null;
+    let selectedServer = null;
+    let userGuilds = [];
 
     function loginWithDiscord() {
       // This will be handled by the backend OAuth2 flow
@@ -426,6 +451,12 @@
 
     function logout() {
       window.location.href = '/auth/logout';
+    }
+
+    function selectServer() {
+      const select = document.getElementById('server-select');
+      selectedServer = select.value;
+      console.log('Selected server:', selectedServer);
     }
 
     function toggleTicketOptions() {
@@ -472,6 +503,12 @@
       const btn = document.querySelector('.btn-primary');
       const status = document.getElementById('status');
       
+      if (!selectedServer) {
+        status.style.color = 'var(--danger)';
+        status.innerText = 'Please select a server first.';
+        return;
+      }
+      
       const buttonsArray = Array.from(document.querySelectorAll('.button-config')).map(config => ({
         name: config.querySelector('.btn-name').value,
         emoji: config.querySelector('.btn-emoji').value,
@@ -487,7 +524,8 @@
         title: document.getElementById('title').value,
         description: document.getElementById('description').value,
         color: document.getElementById('color').value,
-        buttons: buttonsArray
+        buttons: buttonsArray,
+        guildId: selectedServer
       };
 
       if (!payload.channelId || !payload.title) {
@@ -537,12 +575,29 @@
         
         if (data.authenticated && data.user) {
           currentUser = data.user;
+          userGuilds = data.guilds || [];
+          
           document.getElementById('login-screen').style.display = 'none';
           document.getElementById('dashboard').style.display = 'block';
           document.getElementById('user-name').textContent = data.user.username || data.user.global_name || 'User';
           if (data.user.avatar) {
             document.getElementById('user-avatar').style.backgroundImage = `url(https://cdn.discordapp.com/avatars/${data.user.id}/${data.user.avatar}.png)`;
             document.getElementById('user-avatar').style.backgroundSize = 'cover';
+          }
+          
+          // Populate server selector
+          const serverSelect = document.getElementById('server-select');
+          serverSelect.innerHTML = '<option value="">Select a server...</option>';
+          
+          userGuilds.forEach(guild => {
+            const option = document.createElement('option');
+            option.value = guild.id;
+            option.textContent = guild.name;
+            serverSelect.appendChild(option);
+          });
+          
+          if (userGuilds.length === 0) {
+            serverSelect.innerHTML = '<option value="">No admin servers found</option>';
           }
         }
       } catch (err) {

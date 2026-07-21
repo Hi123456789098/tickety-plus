@@ -73,7 +73,8 @@ db.exec(`
     staff_role_id TEXT,
     category_id TEXT,
     required_role_id TEXT,
-    max_tickets_per_user INTEGER DEFAULT 1
+    max_tickets_per_user INTEGER DEFAULT 1,
+    guild_id TEXT
   )
 `);
 
@@ -117,7 +118,9 @@ app.get('/auth/callback',
 
 app.get('/auth/user', (req, res) => {
   if (req.isAuthenticated() && req.user.isAdmin) {
-    res.json({ authenticated: true, user: req.user });
+    // Filter guilds where user has admin permissions
+    const adminGuilds = req.user.guilds?.filter(guild => guild.permissions & 0x8) || [];
+    res.json({ authenticated: true, user: req.user, guilds: adminGuilds });
   } else {
     res.json({ authenticated: false });
   }
@@ -135,7 +138,7 @@ app.post('/api/send-panel', (req, res, next) => {
   }
   next();
 }, async (req, res) => {
-  const { channelId, title, description, color, type, buttons, categoryId } = req.body;
+  const { channelId, title, description, color, type, buttons, categoryId, guildId } = req.body;
 
   try {
     // Fallback empty strings to null to prevent validation crashes
@@ -154,8 +157,8 @@ app.post('/api/send-panel', (req, res, next) => {
           const uniqueId = 'ticket_' + Math.random().toString(36).substring(2, 9);
           
           // Save the mapping with enhanced configuration
-          const stmt = db.prepare('INSERT OR REPLACE INTO panel_configs (custom_id, panel_id, button_label, button_emoji, staff_role_id, category_id, required_role_id, max_tickets_per_user) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-          stmt.run(uniqueId, panelId, b.name, b.emoji || null, b.staffRoleId || null, b.categoryId || categoryId || null, b.requiredRoleId || null, b.maxTickets || 1);
+          const stmt = db.prepare('INSERT OR REPLACE INTO panel_configs (custom_id, panel_id, button_label, button_emoji, staff_role_id, category_id, required_role_id, max_tickets_per_user, guild_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+          stmt.run(uniqueId, panelId, b.name, b.emoji || null, b.staffRoleId || null, b.categoryId || categoryId || null, b.requiredRoleId || null, b.maxTickets || 1, guildId || null);
 
           const button = new ButtonBuilder()
             .setCustomId(uniqueId)
