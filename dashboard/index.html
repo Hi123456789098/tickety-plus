@@ -137,6 +137,81 @@
       font-size: 14px;
       cursor: pointer;
     }
+    .channel-selector {
+      margin-bottom: 20px;
+    }
+    .channel-select {
+      width: 100%;
+      padding: 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .role-selector {
+      position: relative;
+    }
+    .role-input {
+      width: 100%;
+      padding: 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+    .role-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+    }
+    .role-dropdown.show {
+      display: block;
+    }
+    .role-option {
+      padding: 10px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .role-option:hover {
+      background: var(--bg-input);
+    }
+    .role-option.selected {
+      background: var(--accent);
+      color: white;
+    }
+    .selected-roles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .role-tag {
+      background: var(--accent);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .role-tag span {
+      cursor: pointer;
+      font-weight: bold;
+    }
     .nav-item {
       padding: 12px 16px;
       border-radius: 10px;
@@ -381,8 +456,10 @@
       <div class="card">
         <h2 class="card-title">Panel Configuration</h2>
         
-        <label>Discord Channel ID</label>
-        <input type="text" id="channelId" placeholder="e.g. 1102394857239">
+        <label>Discord Channel</label>
+        <select id="channelId" class="input" disabled>
+          <option value="">Select a server first</option>
+        </select>
 
         <label>Panel Type</label>
         <select id="type" onchange="toggleTicketOptions()">
@@ -400,16 +477,24 @@
               </div>
               <div class="button-settings">
                 <div class="setting-row">
-                  <label style="margin-top: 0;">Staff Role ID</label>
-                  <input type="text" class="btn-staff-role" placeholder="Role to ping">
+                  <label style="margin-top: 0;">Staff Roles (type @ to search)</label>
+                  <div class="role-selector">
+                    <input type="text" class="btn-staff-role role-input" placeholder="Type @role or search..." oninput="handleRoleInput(this, event)">
+                    <div class="role-dropdown"></div>
+                    <div class="selected-roles"></div>
+                  </div>
                 </div>
                 <div class="setting-row">
                   <label style="margin-top: 0;">Category ID</label>
                   <input type="text" class="btn-category" placeholder="Ticket category">
                 </div>
                 <div class="setting-row">
-                  <label style="margin-top: 0;">Required Role ID</label>
-                  <input type="text" class="btn-required-role" placeholder="Role needed (optional)">
+                  <label style="margin-top: 0;">Required Role (type @ to search)</label>
+                  <div class="role-selector">
+                    <input type="text" class="btn-required-role role-input" placeholder="Type @role or search..." oninput="handleRoleInput(this, event)">
+                    <div class="role-dropdown"></div>
+                    <div class="selected-roles"></div>
+                  </div>
                 </div>
                 <div class="setting-row">
                   <label style="margin-top: 0;">Max Tickets</label>
@@ -443,6 +528,7 @@
     let currentUser = null;
     let selectedServer = null;
     let userGuilds = [];
+    let allRoles = [];
 
     function loginWithDiscord() {
       // This will be handled by the backend OAuth2 flow
@@ -453,10 +539,122 @@
       window.location.href = '/auth/logout';
     }
 
-    function selectServer() {
+    async function selectServer() {
       const select = document.getElementById('server-select');
       selectedServer = select.value;
       console.log('Selected server:', selectedServer);
+      
+      if (selectedServer) {
+        // Fetch channels for this server
+        await fetchChannels(selectedServer);
+        // Fetch roles for this server
+        await fetchRoles(selectedServer);
+      } else {
+        // Reset channel selector
+        const channelSelect = document.getElementById('channelId');
+        channelSelect.innerHTML = '<option value="">Select a server first</option>';
+        channelSelect.disabled = true;
+      }
+    }
+
+    async function fetchChannels(guildId) {
+      try {
+        const response = await fetch(`/api/guild-channels/${guildId}`);
+        const data = await response.json();
+        
+        const channelSelect = document.getElementById('channelId');
+        channelSelect.innerHTML = '<option value="">Select a channel</option>';
+        
+        data.channels.forEach(channel => {
+          const option = document.createElement('option');
+          option.value = channel.id;
+          option.textContent = `#${channel.name}`;
+          channelSelect.appendChild(option);
+        });
+        
+        channelSelect.disabled = false;
+      } catch (err) {
+        console.error('Error fetching channels:', err);
+      }
+    }
+
+    async function fetchRoles(guildId) {
+      try {
+        const response = await fetch(`/api/guild-roles/${guildId}`);
+        const data = await response.json();
+        
+        allRoles = data.roles || [];
+        console.log('Fetched roles:', allRoles);
+      } catch (err) {
+        console.error('Error fetching roles:', err);
+      }
+    }
+
+    function handleRoleInput(input, event) {
+      const value = input.value;
+      const dropdown = input.parentElement.querySelector('.role-dropdown');
+      const selectedRolesContainer = input.parentElement.querySelector('.selected-roles');
+      
+      // Check if user typed @
+      if (value.startsWith('@') || value.length > 0) {
+        const searchTerm = value.replace('@', '').toLowerCase();
+        
+        // Filter roles
+        const filteredRoles = allRoles.filter(role => 
+          role.name.toLowerCase().includes(searchTerm)
+        );
+        
+        // Show dropdown
+        dropdown.innerHTML = '';
+        if (filteredRoles.length > 0) {
+          dropdown.classList.add('show');
+          filteredRoles.forEach(role => {
+            const option = document.createElement('div');
+            option.className = 'role-option';
+            option.innerHTML = `<span style="color: ${role.color ? '#' + role.color.toString(16) : '#99aab5'}">@${role.name}</span>`;
+            option.onclick = () => selectRole(input, role, dropdown, selectedRolesContainer);
+            dropdown.appendChild(option);
+          });
+        } else {
+          dropdown.classList.remove('show');
+        }
+      } else {
+        dropdown.classList.remove('show');
+      }
+    }
+
+    function selectRole(input, role, dropdown, selectedRolesContainer) {
+      // Check if role already selected
+      const existingTags = selectedRolesContainer.querySelectorAll('.role-tag');
+      for (let tag of existingTags) {
+        if (tag.dataset.roleId === role.id) {
+          dropdown.classList.remove('show');
+          input.value = '';
+          return;
+        }
+      }
+      
+      // Add role tag
+      const tag = document.createElement('div');
+      tag.className = 'role-tag';
+      tag.dataset.roleId = role.id;
+      tag.innerHTML = `<span style="color: ${role.color ? '#' + role.color.toString(16) : '#99aab5'}">@${role.name}</span> <span onclick="removeRoleTag(this)">×</span>`;
+      selectedRolesContainer.appendChild(tag);
+      
+      // Clear input and hide dropdown
+      input.value = '';
+      dropdown.classList.remove('show');
+    }
+
+    function removeRoleTag(closeBtn) {
+      const tag = closeBtn.parentElement;
+      tag.remove();
+    }
+
+    function getSelectedRoles(input) {
+      const selectedRolesContainer = input.parentElement.querySelector('.selected-roles');
+      const tags = selectedRolesContainer.querySelectorAll('.role-tag');
+      return Array.from(tags).map(tag => tag.dataset.roleId);
     }
 
     function toggleTicketOptions() {
@@ -479,16 +677,24 @@
         </div>
         <div class="button-settings">
           <div class="setting-row">
-            <label style="margin-top: 0;">Staff Role ID</label>
-            <input type="text" class="btn-staff-role" placeholder="Role to ping">
+            <label style="margin-top: 0;">Staff Roles (type @ to search)</label>
+            <div class="role-selector">
+              <input type="text" class="btn-staff-role role-input" placeholder="Type @role or search..." oninput="handleRoleInput(this, event)">
+              <div class="role-dropdown"></div>
+              <div class="selected-roles"></div>
+            </div>
           </div>
           <div class="setting-row">
             <label style="margin-top: 0;">Category ID</label>
             <input type="text" class="btn-category" placeholder="Ticket category">
           </div>
           <div class="setting-row">
-            <label style="margin-top: 0;">Required Role ID</label>
-            <input type="text" class="btn-required-role" placeholder="Role needed (optional)">
+            <label style="margin-top: 0;">Required Role (type @ to search)</label>
+            <div class="role-selector">
+              <input type="text" class="btn-required-role role-input" placeholder="Type @role or search..." oninput="handleRoleInput(this, event)">
+              <div class="role-dropdown"></div>
+              <div class="selected-roles"></div>
+            </div>
           </div>
           <div class="setting-row">
             <label style="margin-top: 0;">Max Tickets</label>
@@ -509,14 +715,19 @@
         return;
       }
       
-      const buttonsArray = Array.from(document.querySelectorAll('.button-config')).map(config => ({
-        name: config.querySelector('.btn-name').value,
-        emoji: config.querySelector('.btn-emoji').value,
-        staffRoleId: config.querySelector('.btn-staff-role').value,
-        categoryId: config.querySelector('.btn-category').value,
-        requiredRoleId: config.querySelector('.btn-required-role').value,
-        maxTickets: parseInt(config.querySelector('.btn-max-tickets').value) || 1
-      }));
+      const buttonsArray = Array.from(document.querySelectorAll('.button-config')).map(config => {
+        const staffRoleInput = config.querySelector('.btn-staff-role');
+        const requiredRoleInput = config.querySelector('.btn-required-role');
+        
+        return {
+          name: config.querySelector('.btn-name').value,
+          emoji: config.querySelector('.btn-emoji').value,
+          staffRoleId: getSelectedRoles(staffRoleInput).join(','),
+          categoryId: config.querySelector('.btn-category').value,
+          requiredRoleId: getSelectedRoles(requiredRoleInput).join(','),
+          maxTickets: parseInt(config.querySelector('.btn-max-tickets').value) || 1
+        };
+      });
 
       const payload = {
         channelId: document.getElementById('channelId').value,
@@ -585,23 +796,36 @@
             document.getElementById('user-avatar').style.backgroundSize = 'cover';
           }
           
-          // Populate server selector
-          const serverSelect = document.getElementById('server-select');
-          serverSelect.innerHTML = '<option value="">Select a server...</option>';
-          
-          userGuilds.forEach(guild => {
-            const option = document.createElement('option');
-            option.value = guild.id;
-            option.textContent = guild.name;
-            serverSelect.appendChild(option);
-          });
-          
-          if (userGuilds.length === 0) {
-            serverSelect.innerHTML = '<option value="">No admin servers found</option>';
-          }
+          // Fetch bot's guilds (only servers where bot is present AND user is admin)
+          await fetchBotGuilds();
         }
       } catch (err) {
         console.log('Not authenticated');
+      }
+    }
+
+    async function fetchBotGuilds() {
+      try {
+        const response = await fetch('/api/bot-guilds');
+        const data = await response.json();
+        
+        const serverSelect = document.getElementById('server-select');
+        serverSelect.innerHTML = '<option value="">Select a server...</option>';
+        
+        data.guilds.forEach(guild => {
+          const option = document.createElement('option');
+          option.value = guild.id;
+          option.textContent = guild.name;
+          serverSelect.appendChild(option);
+        });
+        
+        if (data.guilds.length === 0) {
+          serverSelect.innerHTML = '<option value="">No servers found where you have admin permissions and the bot is present</option>';
+        }
+      } catch (err) {
+        console.error('Error fetching bot guilds:', err);
+        const serverSelect = document.getElementById('server-select');
+        serverSelect.innerHTML = '<option value="">Error loading servers</option>';
       }
     }
 

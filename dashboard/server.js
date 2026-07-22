@@ -186,6 +186,58 @@ app.get('/auth/debug', (req, res) => {
   });
 });
 
+// Get bot's guilds
+app.get('/api/bot-guilds', async (req, res) => {
+  try {
+    const rest = new REST({ version: '10' }).setToken(config.token);
+    const guilds = await rest.get(Routes.userGuilds());
+    
+    // Filter guilds where user is admin AND bot is present
+    const userAdminGuilds = req.user?.guilds?.filter(g => g.permissions & 0x8) || [];
+    const botGuildIds = new Set(guilds.map(g => g.id));
+    const commonGuilds = userAdminGuilds.filter(g => botGuildIds.has(g.id));
+    
+    res.json({ guilds: commonGuilds });
+  } catch (error) {
+    console.error('Error fetching bot guilds:', error);
+    res.status(500).json({ error: 'Failed to fetch bot guilds' });
+  }
+});
+
+// Get channels for a guild
+app.get('/api/guild-channels/:guildId', async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const rest = new REST({ version: '10' }).setToken(config.token);
+    const channels = await rest.get(Routes.guildChannels(guildId));
+    
+    // Filter for text channels only
+    const textChannels = channels.filter(c => c.type === 0);
+    
+    res.json({ channels: textChannels });
+  } catch (error) {
+    console.error('Error fetching guild channels:', error);
+    res.status(500).json({ error: 'Failed to fetch channels' });
+  }
+});
+
+// Get roles for a guild
+app.get('/api/guild-roles/:guildId', async (req, res) => {
+  try {
+    const { guildId } = req.params;
+    const rest = new REST({ version: '10' }).setToken(config.token);
+    const roles = await rest.get(Routes.guildRoles(guildId));
+    
+    // Filter out @everyone role
+    const rolesFiltered = roles.filter(r => r.name !== '@everyone');
+    
+    res.json({ roles: rolesFiltered });
+  } catch (error) {
+    console.error('Error fetching guild roles:', error);
+    res.status(500).json({ error: 'Failed to fetch roles' });
+  }
+});
+
 app.post('/api/send-panel', (req, res, next) => {
   if (!req.isAuthenticated() || !req.user.isAdmin) {
     return res.status(401).json({ success: false, error: 'Authentication required. Only server administrators can access this endpoint.' });
