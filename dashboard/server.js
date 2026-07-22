@@ -146,11 +146,24 @@ app.get('/auth/callback',
 );
 
 app.get('/auth/user', (req, res) => {
-  if (req.isAuthenticated() && req.user.isAdmin) {
-    // Filter guilds where user has admin permissions
-    const adminGuilds = req.user.guilds?.filter(guild => guild.permissions & 0x8) || [];
-    res.json({ authenticated: true, user: req.user, guilds: adminGuilds });
+  console.log('[Auth Check] isAuthenticated:', req.isAuthenticated());
+  console.log('[Auth Check] req.user:', req.user ? req.user.username : 'none');
+  
+  if (req.isAuthenticated()) {
+    // Check if user is admin in any guild
+    const isAdmin = req.user.isAdmin || (req.user.guilds?.some(guild => guild.permissions & 0x8) || false);
+    
+    if (isAdmin) {
+      // Filter guilds where user has admin permissions
+      const adminGuilds = req.user.guilds?.filter(guild => guild.permissions & 0x8) || [];
+      console.log('[Auth Check] User is admin, guilds:', adminGuilds.length);
+      res.json({ authenticated: true, user: req.user, guilds: adminGuilds });
+    } else {
+      console.log('[Auth Check] User is not admin');
+      res.json({ authenticated: false, error: 'not_admin' });
+    }
   } else {
+    console.log('[Auth Check] User not authenticated');
     res.json({ authenticated: false });
   }
 });
@@ -158,6 +171,16 @@ app.get('/auth/user', (req, res) => {
 app.get('/auth/logout', (req, res) => {
   req.logout(() => {
     res.redirect('/');
+  });
+});
+
+// Debug endpoint to check session
+app.get('/auth/debug', (req, res) => {
+  res.json({
+    isAuthenticated: req.isAuthenticated(),
+    hasSession: !!req.session,
+    sessionID: req.sessionID,
+    user: req.user ? { id: req.user.id, username: req.user.username } : null
   });
 });
 
