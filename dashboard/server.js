@@ -23,10 +23,12 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: process.env.NODE_ENV === 'production', // true in production with HTTPS
+    secure: false, // Set to false for Render (they handle SSL termination)
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax'
-  }
+    sameSite: 'lax',
+    httpOnly: true
+  },
+  name: 'tickety.sid'
 }));
 
 // Passport configuration
