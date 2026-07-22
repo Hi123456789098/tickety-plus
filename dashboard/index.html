@@ -709,14 +709,6 @@
                   <input type="text" class="btn-category" placeholder="Ticket category">
                 </div>
                 <div class="setting-row">
-                  <label style="margin-top: 0;">Required Role (type @ to search)</label>
-                  <div class="role-selector">
-                    <input type="text" class="btn-required-role role-input" placeholder="Type @role or search..." oninput="handleRoleInput(this, event)">
-                    <div class="role-dropdown"></div>
-                    <div class="selected-roles"></div>
-                  </div>
-                </div>
-                <div class="setting-row">
                   <label style="margin-top: 0;">Max Tickets</label>
                   <input type="number" class="btn-max-tickets" placeholder="1" value="1" min="1" max="10">
                 </div>
@@ -815,8 +807,8 @@
       const dropdown = input.parentElement.querySelector('.role-dropdown');
       const selectedRolesContainer = input.parentElement.querySelector('.selected-roles');
       
-      // Check if user typed @
-      if (value.startsWith('@') || value.length > 0) {
+      // Check if user typed @ or has any input
+      if (value.length > 0) {
         const searchTerm = value.replace('@', '').toLowerCase();
         
         // Filter roles
@@ -831,7 +823,8 @@
           filteredRoles.forEach(role => {
             const option = document.createElement('div');
             option.className = 'role-option';
-            option.innerHTML = `<span style="color: ${role.color ? '#' + role.color.toString(16) : '#99aab5'}">@${role.name}</span>`;
+            const color = role.color ? '#' + role.color.toString(16).padStart(6, '0') : '#99aab5';
+            option.innerHTML = `<span style="color: ${color}">@${role.name}</span>`;
             option.onclick = () => selectRole(input, role, dropdown, selectedRolesContainer);
             dropdown.appendChild(option);
           });
@@ -858,7 +851,8 @@
       const tag = document.createElement('div');
       tag.className = 'role-tag';
       tag.dataset.roleId = role.id;
-      tag.innerHTML = `<span style="color: ${role.color ? '#' + role.color.toString(16) : '#99aab5'}">@${role.name}</span> <span onclick="removeRoleTag(this)">×</span>`;
+      const color = role.color ? '#' + role.color.toString(16).padStart(6, '0') : '#99aab5';
+      tag.innerHTML = `<span style="color: ${color}">@${role.name}</span> <span onclick="removeRoleTag(this)">×</span>`;
       selectedRolesContainer.appendChild(tag);
       
       // Clear input and hide dropdown
@@ -909,14 +903,6 @@
             <input type="text" class="btn-category" placeholder="Ticket category">
           </div>
           <div class="setting-row">
-            <label style="margin-top: 0;">Required Role (type @ to search)</label>
-            <div class="role-selector">
-              <input type="text" class="btn-required-role role-input" placeholder="Type @role or search..." oninput="handleRoleInput(this, event)">
-              <div class="role-dropdown"></div>
-              <div class="selected-roles"></div>
-            </div>
-          </div>
-          <div class="setting-row">
             <label style="margin-top: 0;">Max Tickets</label>
             <input type="number" class="btn-max-tickets" placeholder="1" value="1" min="1" max="10">
           </div>
@@ -937,14 +923,12 @@
       
       const buttonsArray = Array.from(document.querySelectorAll('.button-config')).map(config => {
         const staffRoleInput = config.querySelector('.btn-staff-role');
-        const requiredRoleInput = config.querySelector('.btn-required-role');
         
         return {
           name: config.querySelector('.btn-name').value,
           emoji: config.querySelector('.btn-emoji').value,
           staffRoleId: getSelectedRoles(staffRoleInput).join(','),
           categoryId: config.querySelector('.btn-category').value,
-          requiredRoleId: getSelectedRoles(requiredRoleInput).join(','),
           maxTickets: parseInt(config.querySelector('.btn-max-tickets').value) || 1
         };
       });
