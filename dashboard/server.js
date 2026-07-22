@@ -70,40 +70,55 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Ensure SQLite table exists with enhanced schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS panel_configs (
-    custom_id TEXT PRIMARY KEY,
-    panel_id TEXT,
-    button_label TEXT,
-    button_emoji TEXT,
-    staff_role_id TEXT,
-    category_id TEXT,
-    required_role_id TEXT,
-    max_tickets_per_user INTEGER DEFAULT 1,
-    guild_id TEXT
-  )
-`);
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS panel_configs (
+      custom_id TEXT PRIMARY KEY,
+      panel_id TEXT,
+      button_label TEXT,
+      button_emoji TEXT,
+      staff_role_id TEXT,
+      category_id TEXT,
+      required_role_id TEXT,
+      max_tickets_per_user INTEGER DEFAULT 1,
+      guild_id TEXT
+    )
+  `);
+  console.log('[Database] panel_configs table ready');
+} catch (err) {
+  console.error('[Database] Error creating panel_configs table:', err);
+}
 
 // Create OAuth2 sessions table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS user_sessions (
-    user_id TEXT PRIMARY KEY,
-    access_token TEXT,
-    refresh_token TEXT,
-    expires_at INTEGER,
-    created_at INTEGER
-  )
-`);
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      user_id TEXT PRIMARY KEY,
+      access_token TEXT,
+      refresh_token TEXT,
+      expires_at INTEGER,
+      created_at INTEGER
+    )
+  `);
+  console.log('[Database] user_sessions table ready');
+} catch (err) {
+  console.error('[Database] Error creating user_sessions table:', err);
+}
 
 // Create guild admins table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS guild_admins (
-    guild_id TEXT,
-    user_id TEXT,
-    added_at INTEGER,
-    PRIMARY KEY (guild_id, user_id)
-  )
-`);
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS guild_admins (
+      guild_id TEXT,
+      user_id TEXT,
+      added_at INTEGER,
+      PRIMARY KEY (guild_id, user_id)
+    )
+  `);
+  console.log('[Database] guild_admins table ready');
+} catch (err) {
+  console.error('[Database] Error creating guild_admins table:', err);
+}
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
